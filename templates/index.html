@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Минимальная PDM-система</title>
+</head>
+<body>
+    <h1>Минимальная PDM-система</h1>
+
+    <!-- Сообщения (успех / ошибка) -->
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <ul style="color: red;">
+        {% for message in messages %}
+          <li>{{ message }}</li>
+        {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    <!-- Форма фильтрации -->
+    <h2>Фильтрация по проекту</h2>
+    <form method="GET" action="/">
+        <label>Проект:
+            <select name="project_filter">
+                <option value="">-- все проекты --</option>
+                {% for project in projects %}
+                    <option value="{{ project }}" {% if selected_project == project %}selected{% endif %}>{{ project }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <button type="submit">Фильтровать</button>
+    </form>
+
+    <hr>
+
+    <!-- Форма загрузки -->
+    <h2>Загрузка PDF-файла</h2>
+    <form method="POST" enctype="multipart/form-data">
+        <label>Существующий проект:
+            <select name="existing_project">
+                <option value="">-- не выбрано --</option>
+                {% for p in projects %}
+                    <option value="{{ p }}">{{ p }}</option>
+                {% endfor %}
+            </select>
+        </label><br><br>
+
+        <label>ИЛИ создать новый проект:
+            <input type="text" name="new_project" placeholder="Название проекта">
+        </label><br><br>
+
+        <label>Раздел:
+            <select name="section">
+                {% for s in sections %}
+                    <option value="{{ s }}">{{ s }}</option>
+                {% endfor %}
+            </select>
+        </label><br><br>
+
+        <label>PDF-файл:
+            <input type="file" name="file" accept=".pdf">
+        </label><br><br>
+
+        <button type="submit">Загрузить</button>
+    </form>
+
+    <hr>
+
+    <!-- Таблица загруженных файлов -->
+    <h2>Загруженные документы</h2>
+    <table border="1" cellpadding="6" cellspacing="0">
+        <tr>
+            <th>Проект</th>
+            <th>Раздел</th>
+            <th>Файл</th>
+            <th>Дата загрузки</th>
+        </tr>
+        {% for file in files %}
+        <tr>
+            <td>{{ file[1] }}</td>
+            <td>{{ file[2] }}</td>
+            <td><a href="{{ url_for('download_file', project=file[1], section=file[2], filename=file[3]) }}">{{ file[3] }}</a></td>
+            <td>{{ file[4] }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+</body>
+</html>
