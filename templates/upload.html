@@ -1,0 +1,247 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script>{% extends "base.html" %}
+
+{% block title %}Загрузка документа - PDM Система{% endblock %}
+
+{% block breadcrumb %}
+{{ super() }}
+<li class="breadcrumb-item"><a href="{{ url_for('projects') }}">Проекты</a></li>
+<li class="breadcrumb-item active">Загрузка документа</li>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card">
+            <div class="card-header text-center">
+                <h4><i class="bi bi-upload"></i> Загрузка нового документа</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data" id="uploadForm">
+                    <div class="mb-4">
+                        <label for="project" class="form-label">
+                            <i class="bi bi-folder"></i> Проект <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select" id="project" name="project" required>
+                            <option value="">Выберите проект</option>
+                            {% for project in projects %}
+                            <option value="{{ project.name }}" 
+                                    {{ 'selected' if request.args.get('project') == project.name else '' }}>
+                                {{ project.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Выберите проект для загрузки документа</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="section" class="form-label">
+                            <i class="bi bi-folder2"></i> Раздел <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select" id="section" name="section" required>
+                            <option value="">Выберите раздел</option>
+                            {% for section in sections %}
+                            <option value="{{ section }}">{{ section }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Выберите раздел для документа</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="file" class="form-label">
+                            <i class="bi bi-file-earmark-pdf"></i> Файл <span class="text-danger">*</span>
+                        </label>
+                        <input type="file" class="form-control" id="file" name="file" accept=".pdf" required>
+                        <div class="form-text">Разрешены только PDF файлы, максимум 16 МБ</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="description" class="form-label">
+                            <i class="bi bi-text-paragraph"></i> Описание
+                        </label>
+                        <textarea class="form-control" id="description" name="description" 
+                                  rows="4" placeholder="Краткое описание документа (необязательно)"></textarea>
+                        <div class="form-text">Дополнительная информация о документе</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="version" class="form-label">
+                            <i class="bi bi-tag"></i> Версия
+                        </label>
+                        <input type="text" class="form-control" id="version" name="version" 
+                               value="1.0" placeholder="Например, 1.0">
+                        <div class="form-text">Укажите версию документа (по умолчанию 1.0)</div>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('projects') }}" class="btn btn-outline-secondary me-md-2">
+                            <i class="bi bi-arrow-left"></i> Отмена
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-circle"></i> Загрузить
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Информационная панель -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6><i class="bi bi-info-circle"></i> Информация</h6>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled">
+                    <li><i class="bi bi-check-circle text-success"></i> Поддерживаются только PDF файлы</li>
+                    <li><i class="bi bi-check-circle text-success"></i> Максимальный размер файла: 16 МБ</li>
+                    <li><i class="bi bi-check-circle text-success"></i> Автоматическое создание папок для проекта и раздела</li>
+                    <li><i class="bi bi-check-circle text-success"></i> Сохранение истории версий документа</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('uploadForm');
+    const fileInput = document.getElementById('file');
+    const projectInput = document.getElementById('project');
+    const sectionInput = document.getElementById('section');
+    const versionInput = document.getElementById('version');
+
+    // Автофокус на поле проекта
+    projectInput.focus();
+
+    // Валидация формы
+    form.addEventListener('submit', function(e) {
+        const project = projectInput.value.trim();
+        const section = sectionInput.value.trim();
+        const file = fileInput.files[0];
+        const version = versionInput.value.trim();
+
+        if (!project) {
+            e.preventDefault();
+            showAlert('Выберите проект', 'error');
+            projectInput.focus();
+            return;
+        }
+
+        if (!section) {
+            e.preventDefault();
+            showAlert('Выберите раздел', 'error');
+            sectionInput.focus();
+            return;
+        }
+
+        if (!file) {
+            e.preventDefault();
+            showAlert('Выберите файл', 'error');
+            fileInput.focus();
+            return;
+        }
+
+        if (!file.name.toLowerCase().endsWith('.pdf')) {
+            e.preventDefault();
+            showAlert('Разрешены только PDF файлы', 'error');
+            fileInput.focus();
+            return;
+        }
+
+        if (file.size > 16 * 1024 * 1024) {
+            e.preventDefault();
+            showAlert('Файл превышает максимальный размер 16 МБ', 'error');
+            fileInput.focus();
+            return;
+        }
+
+        if (version && !/^\d+\.\d+$/.test(version)) {
+            e.preventDefault();
+            showAlert('Версия должна быть в формате X.Y (например, 1.0)', 'error');
+            versionInput.focus();
+            return;
+        }
+
+        // Показать индикатор загрузки
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Загрузка...';
+        submitBtn.disabled = true;
+
+        // Восстановить кнопку в случае ошибки
+        setTimeout(() => {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }, 5000);
+    });
+
+    // Функция показа сообщений
+    function showAlert(message, type) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+            <i class="bi bi-exclamation-triangle"></i> ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        form.insertBefore(alertDiv, form.firstChild);
+
+        setTimeout(() => {
+            alertDiv.remove();
+        }, 5000);
+    }
+
+    // Анимация появления карточек
+    const cards = document.querySelectorAll('.card');
+    cards.forEach((card, index) => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        
+        setTimeout(() => {
+            card.style.transition = 'all 0.5s ease';
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+        }, index * 200);
+    });
+});
+</script>
+{% endblock %}

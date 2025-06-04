@@ -1,76 +1,60 @@
 {% extends "base.html" %}
 
-{% block title %}{{ project.name }} - PDM Система{% endblock %}
+{% block title %}Документы - PDM Система{% endblock %}
 
 {% block breadcrumb %}
 {{ super() }}
-<li class="breadcrumb-item"><a href="{{ url_for('projects') }}">Проекты</a></li>
-<li class="breadcrumb-item active">{{ project.name }}</li>
+<li class="breadcrumb-item active">Документы</li>
 {% endblock %}
 
 {% block content %}
-<!-- Заголовок проекта -->
-<div class="page-header">
-    <div class="container-fluid">
-        <div class="row align-items-center">
-            <div class="col-md-8">
-                <h1><i class="bi bi-folder-open"></i> {{ project.name }}</h1>
-                {% if project.description %}
-                <p class="lead">{{ project.description }}</p>
-                {% endif %}
-            </div>
-            <div class="col-md-4 text-md-end">
-                <a href="{{ url_for('upload_document') }}?project={{ project.name }}" 
-                   class="btn btn-light btn-lg">
-                    <i class="bi bi-upload"></i> Загрузить документ
-                </a>
-            </div>
-        </div>
-    </div>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-files"></i> Все документы</h2>
+    <a href="{{ url_for('upload_document') }}" class="btn btn-primary">
+        <i class="bi bi-upload"></i> Загрузить документ
+    </a>
 </div>
 
-<!-- Статистика по разделам -->
-<div class="row mb-4">
-    {% for stat in section_stats %}
-    <div class="col-md-2 mb-3">
-        <div class="card text-center h-100">
-            <div class="card-body">
-                <i class="bi bi-folder2 display-4 text-primary"></i>
-                <h5 class="card-title mt-2">{{ stat.count }}</h5>
-                <p class="card-text">{{ stat.section }}</p>
-                <small class="text-muted">{{ (stat.size | file_size_mb) }} МБ</small>
-            </div>
-        </div>
-    </div>
-    {% endfor %}
-</div>
-
-<!-- Фильтры -->
+<!-- Поиск и фильтры -->
 <div class="card mb-4">
     <div class="card-body">
-        <div class="row align-items-center">
-            <div class="col-md-8">
-                <h6><i class="bi bi-funnel"></i> Фильтрация по разделам</h6>
-            </div>
+        <form method="GET" class="row g-3">
             <div class="col-md-4">
-                <div class="btn-group w-100" role="group">
-                    <a href="{{ url_for('project_detail', project_name=project.name) }}" 
-                       class="btn btn-{{ 'primary' if not current_section else 'outline-primary' }}">
-                        Все
-                    </a>
+                <div class="search-box">
+                    <i class="bi bi-search"></i>
+                    <input type="text" class="form-control" name="search" 
+                           placeholder="Поиск документов..."
+                           value="{{ search }}">
                 </div>
             </div>
-        </div>
-        <div class="row mt-2">
-            {% for section in sections %}
-            <div class="col-md-2 mb-2">
-                <a href="{{ url_for('project_detail', project_name=project.name, section=section) }}" 
-                   class="btn btn-{{ 'primary' if current_section == section else 'outline-primary' }} w-100">
-                    {{ section }}
-                </a>
+            <div class="col-md-3">
+                <select class="form-select" name="project">
+                    <option value="">Все проекты</option>
+                    {% for project in projects %}
+                    <option value="{{ project.project }}" 
+                            {{ 'selected' if project_filter == project.project else '' }}>
+                        {{ project.project }}
+                    </option>
+                    {% endfor %}
+                </select>
             </div>
-            {% endfor %}
-        </div>
+            <div class="col-md-3">
+                <select class="form-select" name="section">
+                    <option value="">Все разделы</option>
+                    {% for section in sections %}
+                    <option value="{{ section }}" 
+                            {{ 'selected' if section_filter == section else '' }}>
+                        {{ section }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-search"></i> Найти
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -79,10 +63,9 @@
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0">
-            <i class="bi bi-files"></i> 
-            Документы {{ '(' + current_section + ')' if current_section else '' }}
+            <i class="bi bi-file-earmark"></i> Найдено документов
         </h5>
-        <span class="badge bg-primary">{{ documents | length }} документ(ов)</span>
+        <span class="badge bg-primary">{{ documents | length }} из общего количества</span>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -90,6 +73,7 @@
                 <thead>
                     <tr>
                         <th>Документ</th>
+                        <th>Проект</th>
                         <th>Раздел</th>
                         <th>Версия</th>
                         <th>Размер</th>
@@ -111,6 +95,12 @@
                                     {% endif %}
                                 </div>
                             </div>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('project_detail', project_name=doc.project) }}" 
+                               class="badge bg-primary text-decoration-none">
+                                {{ doc.project }}
+                            </a>
                         </td>
                         <td>
                             <span class="badge bg-secondary">{{ doc.section }}</span>
@@ -153,22 +143,62 @@
         </div>
     </div>
 </div>
+
+<!-- Пагинация -->
+{% if total_pages > 1 %}
+<nav class="mt-4">
+    <ul class="pagination justify-content-center">
+        {% if current_page > 1 %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('documents', page=current_page-1, search=search, project=project_filter, section=section_filter) }}">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+        </li>
+        {% endif %}
+        
+        {% for page in range(1, total_pages + 1) %}
+            {% if page == current_page %}
+            <li class="page-item active">
+                <span class="page-link">{{ page }}</span>
+            </li>
+            {% elif page <= 3 or page >= total_pages - 2 or (page >= current_page - 2 and page <= current_page + 2) %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('documents', page=page, search=search, project=project_filter, section=section_filter) }}">
+                    {{ page }}
+                </a>
+            </li>
+            {% elif page == 4 or page == total_pages - 3 %}
+            <li class="page-item disabled">
+                <span class="page-link">...</span>
+            </li>
+            {% endif %}
+        {% endfor %}
+        
+        {% if current_page < total_pages %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('documents', page=current_page+1, search=search, project=project_filter, section=section_filter) }}">
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
 {% else %}
 <div class="card">
     <div class="card-body text-center py-5">
         <i class="bi bi-inbox display-1 text-muted"></i>
-        <h3 class="mt-3 text-muted">Документы отсутствуют</h3>
-        {% if current_section %}
-        <p class="text-muted">В разделе "{{ current_section }}" нет документов</p>
-        <a href="{{ url_for('project_detail', project_name=project.name) }}" 
-           class="btn btn-outline-primary me-2">
-            <i class="bi bi-arrow-left"></i> Показать все разделы
+        <h3 class="mt-3 text-muted">Документы не найдены</h3>
+        {% if search or project_filter or section_filter %}
+        <p class="text-muted">Попробуйте изменить параметры поиска</p>
+        <a href="{{ url_for('documents') }}" class="btn btn-outline-primary me-2">
+            <i class="bi bi-arrow-left"></i> Сбросить фильтры
         </a>
         {% else %}
-        <p class="text-muted">Загрузите первый документ в проект</p>
+        <p class="text-muted">Загрузите первый документ</p>
         {% endif %}
-        <a href="{{ url_for('upload_document') }}?project={{ project.name }}" 
-           class="btn btn-primary">
+        <a href="{{ url_for('upload_document') }}" class="btn btn-primary">
             <i class="bi bi-upload"></i> Загрузить документ
         </a>
     </div>
@@ -214,19 +244,9 @@ function confirmDelete(docId, fileName) {
     modal.show();
 }
 
-// Анимация появления карточек
+// Автофокус на поле поиска
 document.addEventListener('DOMContentLoaded', function() {
-    const cards = document.querySelectorAll('.card');
-    cards.forEach((card, index) => {
-        card.style.opacity = '0';
-        card.style.transform = 'translateY(20px)';
-        
-        setTimeout(() => {
-            card.style.transition = 'all 0.5s ease';
-            card.style.opacity = '1';
-            card.style.transform = 'translateY(0)';
-        }, index * 100);
-    });
+    document.querySelector('input[name="search"]').focus();
 });
 </script>
 {% endblock %}

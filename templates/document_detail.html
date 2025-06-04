@@ -1,0 +1,209 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script>{% extends "base.html" %}
+
+{% block title %}Документ: {{ document.original_filename }} - PDM Система{% endblock %}
+
+{% block breadcrumb %}
+{{ super() }}
+<li class="breadcrumb-item"><a href="{{ url_for('projects') }}">Проекты</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('project_detail', project_name=document.project) }}">{{ document.project }}</a></li>
+<li class="breadcrumb-item active">{{ document.original_filename }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="container-fluid">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1><i class="bi bi-file-earmark-pdf text-danger"></i> {{ document.original_filename }}</h1>
+                {% if document.description %}
+                <p class="lead text-muted">{{ document.description }}</p>
+                {% endif %}
+            </div>
+            <div class="col-md-4 text-md-end">
+                <div class="btn-group">
+                    <a href="{{ url_for('download_document', doc_id=document.id) }}" 
+                       class="btn btn-success">
+                        <i class="bi bi-download"></i> Скачать
+                    </a>
+                    <button type="button" class="btn btn-danger" 
+                            onclick="confirmDelete({{ document.id }}, '{{ document.original_filename }}')"
+                            title="Удалить">
+                        <i class="bi bi-trash"></i> Удалить
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Информация о документе -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-info-circle"></i> Информация о документе</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <p><strong>Проект:</strong> 
+                    <a href="{{ url_for('project_detail', project_name=document.project) }}" 
+                       class="badge bg-primary text-decoration-none">
+                        {{ document.project }}
+                    </a>
+                </p>
+                <p><strong>Раздел:</strong> <span class="badge bg-secondary">{{ document.section }}</span></p>
+                <p><strong>Версия:</strong> <span class="badge bg-info">v{{ document.version }}</span></p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>Размер:</strong> {{ (document.file_size | file_size_mb) }} МБ</p>
+                <p><strong>Дата загрузки:</strong> {{ document.upload_date.split(' ')[0] }}</p>
+                <p><strong>Статус:</strong> 
+                    <span class="badge bg-{{ 'success' if document.status == 'Активный' else 'secondary' }}">
+                        {{ document.status }}
+                    </span>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- История версий -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-clock-history"></i> История версий</h5>
+    </div>
+    <div class="card-body p-0">
+        {% if history %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Версия</th>
+                        <th>Файл</th>
+                        <th>Дата</th>
+                        <th>Комментарий</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in history %}
+                    <tr>
+                        <td><span class="badge bg-info">v{{ entry.version }}</span></td>
+                        <td>{{ entry.filename }}</td>
+                        <td>
+                            <small class="text-muted">{{ entry.upload_date.split(' ')[0] }}</small>
+                        </td>
+                        <td>{{ entry.comment }}</td>
+                        <td>
+                            <a href="{{ url_for('download_document', doc_id=document.id) }}" 
+                               class="btn btn-outline-success btn-sm" title="Скачать">
+                                <i class="bi bi-download"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="card-body text-center py-4">
+            <i class="bi bi-inbox display-1 text-muted"></i>
+            <p class="text-muted mt-2">История версий отсутствует</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Модальное окно подтверждения удаления -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Подтверждение удаления</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Вы уверены, что хотите удалить документ:</p>
+                <p><strong id="deleteFileName"></strong></p>
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Это действие нельзя отменить!
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <form id="deleteForm" method="POST" style="display: inline;">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Удалить
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function confirmDelete(docId, fileName) {
+    document.getElementById('deleteFileName').textContent = fileName;
+    document.getElementById('deleteForm').action = '/delete/' + docId;
+    
+    const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+    modal.show();
+}
+
+// Анимация появления карточек
+document.addEventListener('DOMContentLoaded', function() {
+    const cards = document.querySelectorAll('.card');
+    cards.forEach((card, index) => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        
+        setTimeout(() => {
+            card.style.transition = 'all 0.5s ease';
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+        }, index * 200);
+    });
+});
+</script>
+{% endblock %}
