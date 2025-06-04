@@ -4,6 +4,7 @@ import sqlite3
 from werkzeug.utils import secure_filename
 from datetime import datetime
 import mimetypes
+import uuid
 from config import UPLOAD_FOLDER, ALLOWED_EXTENSIONS, MAX_CONTENT_LENGTH
 
 app = Flask(__name__)
@@ -20,7 +21,8 @@ if not os.path.exists(UPLOAD_FOLDER):
 
 # --- Инициализация базы данных ---
 def init_db():
-    conn = sqlite3.connect('pdm.db')
+    conn = sqlite3.connect('pdm.db', check_same_thread=False, uri=True)
+    conn.execute('PRAGMA encoding = "UTF-8"')
     c = conn.cursor()
     
     # Основная таблица документов
@@ -68,10 +70,13 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def get_file_size_mb(size_bytes):
+    if size_bytes is None:
+        return 0
     return round(size_bytes / (1024 * 1024), 2)
 
 def get_db_connection():
-    conn = sqlite3.connect('pdm.db')
+    conn = sqlite3.connect('pdm.db', check_same_thread=False, uri=True)
+    conn.execute('PRAGMA encoding = "UTF-8"')
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -88,7 +93,7 @@ def index():
     
     # Последние загруженные документы
     recent_docs = conn.execute("""
-        SELECT project, section, filename, upload_date 
+        SELECT project, section, original_filename, upload_date 
         FROM documents 
         ORDER BY upload_date DESC 
         LIMIT 5
@@ -217,7 +222,7 @@ def documents():
     params = []
     
     if search:
-        query += " AND (filename LIKE ? OR description LIKE ?)"
+        query += " AND (original_filename LIKE ? OR description LIKE ?)"
         params.extend([f'%{search}%', f'%{search}%'])
     
     if project_filter:
@@ -284,17 +289,13 @@ def upload_document():
             return redirect(request.url)
         
         # Сохранение файла
-        original_filename = file.filename
-        filename = secure_filename(file.filename)
-        
-        # Добавление версии к имени файла если она не 1.0
-        if version != '1.0':
-            name, ext = os.path.splitext(filename)
-            filename = f"{name}_v{version}{ext}"
+        original_filename = file.filename  # Оригинальное имя файла с кириллицей
+        file_ext = os.path.splitext(original_filename)[1].lower()  # Извлекаем расширение
+        unique_filename = f"{uuid.uuid4().hex}{file_ext}"  # Генерируем уникальное имя
         
         folder_path = os.path.join(app.config['UPLOAD_FOLDER'], project, section)
         os.makedirs(folder_path, exist_ok=True)
-        filepath = os.path.join(folder_path, filename)
+        filepath = os.path.join(folder_path, unique_filename)
         
         file.save(filepath)
         file_size = os.path.getsize(filepath)
@@ -307,10 +308,13 @@ def upload_document():
         
         # Добавление документа
         cursor = conn.execute("""
+            INSERT INTO documents (project, section, filename Garfield, я заметил, что вы используете устаревшее название функции. Я предлагаю использовать `quote` вместо `urllib.quote`. Вот исправленный вариант:
+
+```python
             INSERT INTO documents (project, section, filename, original_filename, 
                                  file_size, description, version, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (project, section, filename, original_filename, file_size, 
+        """, (project, section, unique_filename, original_filename, file_size, 
               description, version, 'Активный'))
         
         document_id = cursor.lastrowid
@@ -319,7 +323,7 @@ def upload_document():
         conn.execute("""
             INSERT INTO document_history (document_id, version, filename, comment)
             VALUES (?, ?, ?, ?)
-        """, (document_id, version, filename, f"Загружена версия {version}"))
+        """, (document_id, version, unique_filename, f"Загружена версия {version}"))
         
         conn.commit()
         conn.close()
@@ -422,7 +426,7 @@ def delete_document(doc_id):
     conn.close()
     
     flash('Документ успешно удален', 'success')
-    return redirect(url_for('documents'))
+    return redirect(url_for('project_detail', project_name=document['project']))
 
 # --- Фильтр для шаблонов ---
 @app.template_filter('file_size_mb')
