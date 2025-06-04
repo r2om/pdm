@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}{{ project.name }} - PDM Система{% endblock %}
+
+{% block breadcrumb %}
+{{ super() }}
+<li class="breadcrumb-item"><a href="{{ url_for('projects') }}">Проекты</a></li>
+<li class="breadcrumb-item active">{{ project.name }}</li>
+{% endblock %}
+
+{% block content %}
+<!-- Заголовок проекта -->
+<div class="page-header">
+    <div class="container-fluid">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1><i class="bi bi-folder-open"></i> {{ project.name }}</h1>
+                {% if project.description %}
+                <p class="lead">{{ project.description }}</p>
+                {% endif %}
+            </div>
+            <div class="col-md-4 text-md-end">
+                <a href="{{ url_for('upload_document') }}?project={{ project.name }}" 
+                   class="btn btn-light btn-lg">
+                    <i class="bi bi-upload"></i> Загрузить документ
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Статистика по разделам -->
+<div class="row mb-4">
+    {% for stat in section_stats %}
+    <div class="col-md-2 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <i class="bi bi-folder2 display-4 text-primary"></i>
+                <h5 class="card-title mt-2">{{ stat.count }}</h5>
+                <p class="card-text">{{ stat.section }}</p>
+                <small class="text-muted">{{ (stat.size | file_size_mb) }} МБ</small>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Фильтры -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h6><i class="bi bi-funnel"></i> Фильтрация по разделам</h6>
+            </div>
+            <div class="col-md-4">
+                <div class="btn-group w-100" role="group">
+                    <a href="{{ url_for('project_detail', project_name=project.name) }}" 
+                       class="btn btn-{{ 'primary' if not current_section else 'outline-primary' }}">
+                        Все
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="row mt-2">
+            {% for section in sections %}
+            <div class="col-md-2 mb-2">
+                <a href="{{ url_for('project_detail', project_name=project.name, section=section) }}" 
+                   class="btn btn-{{ 'primary' if current_section == section else 'outline-primary' }} w-100">
+                    {{ section }}
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Список документов -->
+{% if documents %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            <i class="bi bi-files"></i> 
+            Документы {{ '(' + current_section + ')' if current_section else '' }}
+        </h5>
+        <span class="badge bg-primary">{{ documents | length }} документ(ов)</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Документ</th>
+                        <th>Раздел</th>
+                        <th>Версия</th>
+                        <th>Размер</th>
+                        <th>Дата</th>
+                        <th>Статус</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for doc in documents %}
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-file-earmark-pdf text-danger me-2"></i>
+                                <div>
+                                    <strong>{{ doc.original_filename }}</strong>
+                                    {% if doc.description %}
+                                    <br><small class="text-muted">{{ doc.description }}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary">{{ doc.section }}</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-info">v{{ doc.version }}</span>
+                        </td>
+                        <td>{{ (doc.file_size | file_size_mb) }} МБ</td>
+                        <td>
+                            <small class="text-muted">
+                                {{ doc.upload_date.split(' ')[0] }}
+                            </small>
+                        </td>
+                        <td>
+                            <span class="badge bg-{{ 'success' if doc.status == 'Активный' else 'secondary' }}">
+                                {{ doc.status }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('document_detail', doc_id=doc.id) }}" 
+                                   class="btn btn-outline-primary" title="Просмотр">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a href="{{ url_for('download_document', doc_id=doc.id) }}" 
+                                   class="btn btn-outline-success" title="Скачать">
+                                    <i class="bi bi-download"></i>
+                                </a>
+                                <button type="button" class="btn btn-outline-danger" 
+                                        onclick="confirmDelete({{ doc.id }}, '{{ doc.original_filename }}')"
+                                        title="Удалить">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body text-center py-5">
+        <i class="bi bi-inbox display-1 text-muted"></i>
+        <h3 class="mt-3 text-muted">Документы отсутствуют</h3>
+        {% if current_section %}
+        <p class="text-muted">В разделе "{{ current_section }}" нет документов</p>
+        <a href="{{ url_for('project_detail', project_name=project.name) }}" 
+           class="btn btn-outline-primary me-2">
+            <i class="bi bi-arrow-left"></i> Показать все разделы
+        </a>
+        {% else %}
+        <p class="text-muted">Загрузите первый документ в проект</p>
+        {% endif %}
+        <a href="{{ url_for('upload_document') }}?project={{ project.name }}" 
+           class="btn btn-primary">
+            <i class="bi bi-upload"></i> Загрузить документ
+        </a>
+    </div>
+</div>
+{% endif %}
+
+<!-- Модальное окно подтверждения удаления -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Подтверждение удаления</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Вы уверены, что хотите удалить документ:</p>
+                <p><strong id="deleteFileName"></strong></p>
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>

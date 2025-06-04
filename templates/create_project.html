@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Создать проект - PDM Система{% endblock %}
+
+{% block breadcrumb %}
+{{ super() }}
+<li class="breadcrumb-item"><a href="{{ url_for('projects') }}">Проекты</a></li>
+<li class="breadcrumb-item active">Создать проект</li>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card">
+            <div class="card-header text-center">
+                <h4><i class="bi bi-plus-square"></i> Создание нового проекта</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" id="projectForm">
+                    <div class="mb-4">
+                        <label for="name" class="form-label">
+                            <i class="bi bi-folder"></i> Название проекта <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" class="form-control" id="name" name="name" 
+                               placeholder="Введите название проекта" required>
+                        <div class="form-text">Уникальное название для идентификации проекта</div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="description" class="form-label">
+                            <i class="bi bi-text-paragraph"></i> Описание проекта
+                        </label>
+                        <textarea class="form-control" id="description" name="description" 
+                                  rows="4" placeholder="Краткое описание проекта (необязательно)"></textarea>
+                        <div class="form-text">Дополнительная информация о проекте</div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('projects') }}" class="btn btn-outline-secondary me-md-2">
+                            <i class="bi bi-arrow-left"></i> Отмена
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-circle"></i> Создать проект
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Информационная панель -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6><i class="bi bi-info-circle"></i> Информация</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Структура проекта:</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="bi bi-folder text-primary"></i> Спецификации</li>
+                            <li><i class="bi bi-folder text-primary"></i> Чертежи</li>
+                            <li><i class="bi bi-folder text-primary"></i> Сборки</li>
+                            <li><i class="bi bi-folder text-primary"></i> Детали</li>
+                            <li><i class="bi bi-folder text-primary"></i> Документация</li>
+                            <li><i class="bi bi-folder text-primary"></i> Протоколы</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Возможности:</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="bi bi-check-circle text-success"></i> Загрузка PDF файлов</li>
+                            <li><i class="bi bi-check-circle text-success"></i> Версионность документов</li>
+                            <li><i class="bi bi-check-circle text-success"></i> Поиск и фильтрация</li>
+                            <li><i class="bi bi-check-circle text-success"></i> История изменений</li>
+                            <li><i class="bi bi-check-circle text-success"></i> Статистика проекта</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('projectForm');
+    const nameInput = document.getElementById('name');
+    
+    // Автофокус на поле названия
+    nameInput.focus();
+    
+    // Валидация формы
+    form.addEventListener('submit', function(e) {
+        const name = nameInput.value.trim();
+        
+        if (!name) {
+            e.preventDefault();
+            showAlert('Название проекта обязательно для заполнения', 'error');
+            nameInput.focus();
+            return;
+        }
+        
+        if (name.length < 3) {
+            e.preventDefault();
+            showAlert('Название проекта должно содержать минимум 3 символа', 'error');
+            nameInput.focus();
+            return;
+        }
+        
+        // Показать индикатор загрузки
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Создание...';
+        submitBtn.disabled = true;
+        
+        // Если возникла ошибка, восстановить кнопку
+        setTimeout(() => {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }, 5000);
+    });
+    
+    // Функция показа сообщений
+    function showAlert(message, type) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+            <i class="bi bi-exclamation-triangle"></i> ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        form.insertBefore(alertDiv, form.firstChild);
+        
+        setTimeout(() => {
+            alertDiv.remove();
+        }, 5000);
+    }
+    
+    // Анимация появления карточек
+    const cards = document.querySelectorAll('.card');
+    cards.forEach((card, index) => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        
+        setTimeout(() => {
+            card.style.transition = 'all 0.5s ease';
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+        }, index * 200);
+    });
+});
+</script>
+{% endblock %}

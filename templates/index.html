@@ -1,90 +1,213 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <title>Минимальная PDM-система</title>
-</head>
-<body>
-    <h1>Минимальная PDM-система</h1>
+{% extends "base.html" %}
 
-    <!-- Сообщения (успех / ошибка) -->
-    {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        <ul style="color: red;">
-        {% for message in messages %}
-          <li>{{ message }}</li>
-        {% endfor %}
-        </ul>
-      {% endif %}
-    {% endwith %}
+{% block title %}Дашборд - PDM Система{% endblock %}
 
-    <!-- Форма фильтрации -->
-    <h2>Фильтрация по проекту</h2>
-    <form method="GET" action="/">
-        <label>Проект:
-            <select name="project_filter">
-                <option value="">-- все проекты --</option>
-                {% for project in projects %}
-                    <option value="{{ project }}" {% if selected_project == project %}selected{% endif %}>{{ project }}</option>
-                {% endfor %}
-            </select>
-        </label>
-        <button type="submit">Фильтровать</button>
-    </form>
+{% block content %}
+<div class="page-header text-center">
+    <h1><i class="bi bi-speedometer2"></i> Дашборд PDM системы</h1>
+    <p class="lead">Система управления документами проектов</p>
+</div>
 
-    <hr>
+<!-- Статистические карточки -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="stats-card">
+            <div class="stats-number">{{ stats.total_projects }}</div>
+            <div class="stats-label">
+                <i class="bi bi-folder"></i> Проекты
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="stats-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+            <div class="stats-number">{{ stats.total_documents }}</div>
+            <div class="stats-label">
+                <i class="bi bi-files"></i> Документы
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="stats-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+            <div class="stats-number">{{ (stats.total_size / 1024 / 1024) | round(1) }}</div>
+            <div class="stats-label">
+                <i class="bi bi-hdd"></i> МБ данных
+            </div>
+        </div>
+    </div>
+</div>
 
-    <!-- Форма загрузки -->
-    <h2>Загрузка PDF-файла</h2>
-    <form method="POST" enctype="multipart/form-data">
-        <label>Существующий проект:
-            <select name="existing_project">
-                <option value="">-- не выбрано --</option>
-                {% for p in projects %}
-                    <option value="{{ p }}">{{ p }}</option>
-                {% endfor %}
-            </select>
-        </label><br><br>
+<!-- Быстрые действия -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-lightning"></i> Быстрые действия</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('create_project') }}" class="btn btn-primary w-100">
+                            <i class="bi bi-plus-circle"></i><br>
+                            Создать проект
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('upload_document') }}" class="btn btn-success w-100">
+                            <i class="bi bi-upload"></i><br>
+                            Загрузить документ
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('projects') }}" class="btn btn-info w-100">
+                            <i class="bi bi-folder2-open"></i><br>
+                            Просмотр проектов
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('documents') }}" class="btn btn-warning w-100">
+                            <i class="bi bi-search"></i><br>
+                            Поиск документов
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
-        <label>ИЛИ создать новый проект:
-            <input type="text" name="new_project" placeholder="Название проекта">
-        </label><br><br>
+<!-- Последние документы -->
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-clock-history"></i> Последние документы</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_docs %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Проект</th>
+                                    <th>Раздел</th>
+                                    <th>Файл</th>
+                                    <th>Дата</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for doc in recent_docs %}
+                                <tr>
+                                    <td>
+                                        <span class="badge bg-primary">{{ doc.project }}</span>
+                                    </td>
+                                    <td>{{ doc.section }}</td>
+                                    <td>
+                                        <i class="bi bi-file-earmark-pdf text-danger"></i>
+                                        {{ doc.filename }}
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">
+                                            {{ doc.upload_date.split(' ')[0] }}
+                                        </small>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="text-center">
+                        <a href="{{ url_for('documents') }}" class="btn btn-outline-primary">
+                            Все документы <i class="bi bi-arrow-right"></i>
+                        </a>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-inbox display-1 text-muted"></i>
+                        <p class="text-muted mt-2">Документы отсутствуют</p>
+                        <a href="{{ url_for('upload_document') }}" class="btn btn-primary">
+                            Загрузить первый документ
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Статистика</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <small>Проекты</small>
+                        <small>{{ stats.total_projects }}</small>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar bg-primary" style="width: {{ (stats.total_projects / 10 * 100) | round }}%"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <small>Документы</small>
+                        <small>{{ stats.total_documents }}</small>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar bg-success" style="width: {{ (stats.total_documents / 100 * 100) | round }}%"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <small>Размер данных</small>
+                        <small>{{ (stats.total_size / 1024 / 1024) | round(1) }} МБ</small>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar bg-info" style="width: {{ ((stats.total_size / 1024 / 1024) / 1000 * 100) | round }}%"></div>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="text-center">
+                    <h6 class="text-muted">Система работает</h6>
+                    <div class="text-success">
+                        <i class="bi bi-check-circle-fill"></i> Онлайн
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
 
-        <label>Раздел:
-            <select name="section">
-                {% for s in sections %}
-                    <option value="{{ s }}">{{ s }}</option>
-                {% endfor %}
-            </select>
-        </label><br><br>
-
-        <label>PDF-файл:
-            <input type="file" name="file" accept=".pdf">
-        </label><br><br>
-
-        <button type="submit">Загрузить</button>
-    </form>
-
-    <hr>
-
-    <!-- Таблица загруженных файлов -->
-    <h2>Загруженные документы</h2>
-    <table border="1" cellpadding="6" cellspacing="0">
-        <tr>
-            <th>Проект</th>
-            <th>Раздел</th>
-            <th>Файл</th>
-            <th>Дата загрузки</th>
-        </tr>
-        {% for file in files %}
-        <tr>
-            <td>{{ file[1] }}</td>
-            <td>{{ file[2] }}</td>
-            <td><a href="{{ url_for('download_file', project=file[1], section=file[2], filename=file[3]) }}">{{ file[3] }}</a></td>
-            <td>{{ file[4] }}</td>
-        </tr>
-        {% endfor %}
-    </table>
-
-</body>
-</html>
+{% block scripts %}
+<script>
+// Анимация счетчиков
+document.addEventListener('DOMContentLoaded', function() {
+    const counters = document.querySelectorAll('.stats-number');
+    
+    counters.forEach(counter => {
+        const target = parseInt(counter.innerText);
+        let current = 0;
+        const increment = target / 50;
+        
+        const updateCounter = () => {
+            if (current < target) {
+                current += increment;
+                counter.innerText = Math.ceil(current);
+                setTimeout(updateCounter, 20);
+            } else {
+                counter.innerText = target;
+            }
+        };
+        
+        updateCounter();
+    });
+});
+</script>
+{% endblock %}
